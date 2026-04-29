@@ -50,4 +50,5 @@ export const CONFIG = {
   // ── Hosting ───────────────────────────────────────────────────────────────
   BASE_URL: 'https://github.com/tanim-mse/Atlas-living-world',   // update to real Pages URL
 
+  
 };
