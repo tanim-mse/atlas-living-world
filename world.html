@@ -899,7 +899,7 @@
     // ── Auth guard ────────────────────────────────────────────────────────
     const sessionValid = await restoreSession();
     if (!sessionValid) {
-      window.location.href = '/index.html';
+      window.location.href = './index.html';
       throw new Error('No valid session — redirecting.');
     }
 

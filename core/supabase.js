@@ -15,7 +15,7 @@ import { CONFIG } from './config.js';
 // One client for the entire application lifetime.  Imported by every module
 // that needs database or auth access.
 
-const { createClient } = supabase;   // loaded via CDN in world.html / index.html
+const { createClient } = window.supabase;   // UMD global set by CDN script tag
 
 export const db = createClient(
   CONFIG.SUPABASE_URL,
