@@ -136,22 +136,31 @@ const RAIN_SPLASH_COUNT = 1200;
  * @returns {Promise<void>}
  */
 export async function initSky() {
-  await _loadShaders();
+  try {
+    await _loadShaders();
 
-  _buildFullScreenHelper();
-  _buildRenderTargets();
-  _buildAtmosphereDome();
-  _buildStarField();
-  _buildMilkyWay();
-  _buildCloudPass();
-  _buildTAAPass();
-  _buildRainSystem();
-  _buildGodRayPass();
+    _buildFullScreenHelper();
+    _buildRenderTargets();
+    _buildAtmosphereDome();
+    _buildStarField();
+    _buildMilkyWay();
+    _buildCloudPass();
+    _buildTAAPass();
+    _buildRainSystem();
+    _buildGodRayPass();
 
-  // Prime weather state from mood data
-  _evaluateWeatherTarget();
+    // Prime weather state from mood data
+    _evaluateWeatherTarget();
 
-  registerUpdate(_tick);
+    registerUpdate(_tick);
+
+    console.log('%cATLAS SKY%c initialised — atmosphere, stars, clouds, rain',
+      'color:#c8a96e;font-weight:bold', 'color:#8a7e6e');
+
+  } catch (err) {
+    console.error('[ATLAS SKY] init failed:', err);
+    throw err;
+  }
 }
 
 /**
@@ -166,9 +175,9 @@ export function disposeSky() {
 
 async function _loadShaders() {
   const [atmos, cloud, rain] = await Promise.all([
-    fetch('../shaders/atmosphere.glsl').then(r => r.text()),
-    fetch('../shaders/cloud.glsl').then(r => r.text()),
-    fetch('../shaders/rain.glsl').then(r => r.text()),
+    fetch('./shaders/atmosphere.glsl').then(r => r.text()),
+    fetch('./shaders/cloud.glsl').then(r => r.text()),
+    fetch('./shaders/rain.glsl').then(r => r.text()),
   ]);
   _atmosSrc = atmos;
   _cloudSrc = cloud;
