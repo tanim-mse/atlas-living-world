@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' cdn.jsdelivr.net unpkg.com;
+    style-src 'self' 'unsafe-inline' fonts.googleapis.com;
+    font-src fonts.gstatic.com;
+    img-src 'self' data: res.cloudinary.com;
+    connect-src 'self' *.supabase.co wss://*.supabase.co;
+    worker-src 'none';
+    object-src 'none';
+  " />
+
+  <title>Atlas — The Living World</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Inter+Tight:wght@300;400&display=swap" rel="stylesheet" />
+
+  <!-- Three.js r128 -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <style>
+    /* ── Reset ──────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Design tokens ──────────────────────────────────────────────────── */
+    :root {
+      --color-bg:            #07060a;
+      --color-surface:       rgba(8, 6, 4, 0.62);
+      --color-border:        rgba(200, 169, 110, 0.12);
+      --color-border-focus:  rgba(200, 169, 110, 0.50);
+      --color-text-primary:  #e8e0d0;
+      --color-text-muted:    #8a7e6e;
+      --color-text-dim:      #4a4038;
+      --color-accent:        #c8a96e;
+      --color-accent-dim:    rgba(200, 169, 110, 0.15);
+      --color-danger:        #c87060;
+      --color-danger-dim:    rgba(200, 112, 96, 0.12);
+
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body:    'Inter Tight', system-ui, sans-serif;
+
+      --shadow-panel: 0 8px 48px rgba(0, 0, 0, 0.65);
+      --blur-panel:   blur(18px);
+      --radius-panel: 4px;
+
+      --hud-opacity-idle:  0.18;
+      --hud-opacity-hover: 1.0;
+      --hud-transition:    200ms ease;
+
+      --transition-panel: 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* ── Base ───────────────────────────────────────────────────────────── */
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--color-bg);
+      overflow: hidden;
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 300;
+      color: var(--color-text-primary);
+      -webkit-font-smoothing: antialiased;
+      cursor: crosshair;
+    }
+
+    /* ── WebGL canvas ───────────────────────────────────────────────────── */
+    #atlas-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+      z-index: 0;
+    }
+
+    /* ── World dim overlay (lock / loading) ─────────────────────────────── */
+    #world-dim {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 3, 6, 0);
+      z-index: 5;
+      pointer-events: none;
+      transition: background 1.2s ease;
+    }
+
+    #world-dim.dimmed {
+      background: rgba(4, 3, 6, 0.82);
+      pointer-events: auto;
+    }
+
+    /* ── Loading screen ─────────────────────────────────────────────────── */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      background: var(--color-bg);
+      transition: opacity 800ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #loading-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-wordmark {
+      font-family: var(--font-display);
+      font-size: 32px;
+      font-weight: 300;
+      letter-spacing: 0.28em;
+      color: var(--color-accent);
+      text-transform: uppercase;
+      text-shadow: 0 0 40px rgba(200, 169, 110, 0.20);
+    }
+
+    .loading-bar-track {
+      width: 160px;
+      height: 1px;
+      background: rgba(200, 169, 110, 0.12);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    .loading-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--color-accent);
+      border-radius: 1px;
+      transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+      box-shadow: 0 0 8px rgba(200, 169, 110, 0.4);
+    }
+
+    .loading-label {
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 300;
+      letter-spacing: 0.22em;
+      color: var(--color-text-dim);
+      text-transform: uppercase;
+      margin-top: -16px;
+    }
+
+    /* ── HUD — global wrapper ───────────────────────────────────────────── */
+    #hud {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      pointer-events: none;   /* children re-enable as needed */
+      opacity: 0;
+      transition: opacity 600ms ease;
+    }
+
+    #hud.visible { opacity: 1; }
+
+    /* ── HUD base element style ─────────────────────────────────────────── */
+    .hud-el {
+      position: absolute;
+      pointer-events: auto;
+      opacity: var(--hud-opacity-idle);
+      transition:
+        opacity var(--hud-transition),
+        transform var(--hud-transition);
+    }
+
+    .hud-el:hover { opacity: var(--hud-opacity-hover); }
+
+    /* ── 1. Zone indicator — top center ─────────────────────────────────── */
+    #hud-zone {
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      pointer-events: none;
+    }
+
+    #hud-zone:hover { opacity: var(--hud-opacity-hover); }
+
+    .hud-zone-compass {
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(200, 169, 110, 0.30);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .hud-zone-compass::before {
+      content: '';
+      position: absolute;
+      width: 1px;
+      height: 8px;
+      background: var(--color-accent);
+      top: 4px;
+      opacity: 0.7;
+      transform-origin: bottom center;
+      transition: transform 800ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .hud-zone-name {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 12px;
+      font-weight: 300;
+      letter-spacing: 0.14em;
+      color: var(--color-accent);
+      white-space: nowrap;
+    }
+
+    /* ── 2. Time & atmosphere — top right ───────────────────────────────── */
+    #hud-time {
+      top: 22px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hud-time-clock {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 300;
+      letter-spacing: 0.12em;
+      color: var(--color-text-primary);
+    }
+
+    .hud-time-icons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hud-icon {
+      width: 14px;
+      height: 14px;
+      opacity: 0.55;
+    }
+
+    /* ── 3. Quick log — bottom right ────────────────────────────────────── */
+    #hud-quicklog {
+      bottom: 28px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .hud-quicklog-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition:
+        border-color var(--hud-transition),
+        background   var(--hud-transition),
+        transform    var(--hud-transition);
+    }
+
+    .hud-quicklog-btn:hover {
+      border-color: rgba(200, 169, 110, 0.40);
+      background: rgba(200, 169, 110, 0.08);
+      transform: scale(1.08);
+    }
+
+    .hud-quicklog-btn svg {
+      width: 15px;
+      height: 15px;
+      stroke: var(--color-accent);
+      fill: none;
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Reading progress pip on book button */
+    #hud-btn-book {
+      position: relative;
+    }
+
+    .reading-progress-pip {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      border: 1.5px solid var(--color-bg);
+      display: none;
+    }
+
+    /* Financial pulse pip */
+    #hud-btn-finance {
+      position: relative;
+    }
+
+    .finance-pulse-pip {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      border: 1.5px solid var(--color-bg);
+      background: #4a8c5c;   /* default: healthy green */
+      display: none;
+    }
+
+    /* ── 4. Graph access — bottom left ──────────────────────────────────── */
+    #hud-graphs {
+      bottom: 28px;
+      left: 24px;
+    }
+
+    .hud-graph-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition:
+        border-color var(--hud-transition),
+        background   var(--hud-transition),
+        transform    var(--hud-transition);
+    }
+
+    .hud-graph-btn:hover {
+      border-color: rgba(200, 169, 110, 0.40);
+      background: rgba(200, 169, 110, 0.08);
+      transform: scale(1.08);
+    }
+
+    .hud-graph-btn svg {
+      width: 15px;
+      height: 15px;
+      stroke: var(--color-accent);
+      fill: none;
+      stroke-width: 1.4;
+      stroke-linecap: round;
+    }
+
+    /* ── 5. User — top left ─────────────────────────────────────────────── */
+    #hud-user {
+      top: 22px;
+      left: 24px;
+    }
+
+    .hud-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--color-border);
+      background: rgba(200, 169, 110, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 300;
+      color: var(--color-accent);
+      letter-spacing: 0.05em;
+      transition:
+        border-color var(--hud-transition),
+        background   var(--hud-transition);
+    }
+
+    .hud-avatar:hover {
+      border-color: rgba(200, 169, 110, 0.40);
+      background: rgba(200, 169, 110, 0.12);
+    }
+
+    /* ── 8. Navigation edge labels ──────────────────────────────────────── */
+    .hud-nav-edge {
+      position: absolute;
+      font-family: var(--font-body);
+      font-size: 9px;
+      font-weight: 300;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      pointer-events: auto;
+      cursor: pointer;
+      transition: color var(--hud-transition), opacity var(--hud-transition);
+      white-space: nowrap;
+    }
+
+    .hud-nav-edge:hover { color: var(--color-accent); }
+
+    #nav-top    { top: 22px;    left: 50%; transform: translateX(-50%) translateY(-2px); }
+    #nav-bottom { bottom: 22px; left: 50%; transform: translateX(-50%); }
+    #nav-left   {
+      left: 22px; top: 50%;
+      transform: translateY(-50%) rotate(-90deg);
+      transform-origin: center center;
+    }
+    #nav-right  {
+      right: 22px; top: 50%;
+      transform: translateY(-50%) rotate(90deg);
+      transform-origin: center center;
+    }
+
+    /* ── Settings panel ─────────────────────────────────────────────────── */
+    #settings-panel {
+      position: fixed;
+      top: 62px;
+      left: 24px;
+      width: 220px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-panel);
+      backdrop-filter: var(--blur-panel);
+      -webkit-backdrop-filter: var(--blur-panel);
+      box-shadow: var(--shadow-panel);
+      z-index: 30;
+      padding: 20px;
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      transform: scale(0.93);
+      opacity: 0;
+      transform-origin: top left;
+      transition:
+        transform var(--transition-panel),
+        opacity   var(--transition-panel);
+    }
+
+    #settings-panel.open {
+      display: flex;
+      transform: scale(1.0);
+      opacity: 1;
+    }
+
+    .settings-label {
+      font-family: var(--font-body);
+      font-size: 9px;
+      font-weight: 400;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--color-text-dim);
+      margin-bottom: 2px;
+    }
+
+    .settings-value {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 300;
+      color: var(--color-text-primary);
+    }
+
+    .settings-divider {
+      width: 100%;
+      height: 1px;
+      background: var(--color-border);
+    }
+
+    .settings-btn {
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 0.08em;
+      color: var(--color-text-muted);
+      text-align: left;
+      transition: color var(--hud-transition);
+    }
+
+    .settings-btn:hover { color: var(--color-danger); }
+
+    /* ── Lock screen — Layer 5 ──────────────────────────────────────────── */
+    #lock-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      background: rgba(4, 3, 6, 0.88);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+    }
+
+    .lock-wordmark {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 300;
+      letter-spacing: 0.30em;
+      color: var(--color-accent);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      opacity: 0.6;
+      text-shadow: 0 0 30px rgba(200, 169, 110, 0.15);
+    }
+
+    .lock-subtitle {
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 300;
+      letter-spacing: 0.22em;
+      color: var(--color-text-dim);
+      text-transform: uppercase;
+      margin-bottom: 48px;
+    }
+
+    .lock-form {
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .lock-input-wrap {
+      position: relative;
+    }
+
+    #lock-password {
+      width: 100%;
+      height: 48px;
+      padding: 0 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+      color: var(--color-text-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 300;
+      letter-spacing: 0.12em;
+      outline: none;
+      text-align: center;
+      transition:
+        border-color 200ms ease,
+        background   200ms ease;
+    }
+
+    #lock-password:focus {
+      border-color: var(--color-border-focus);
+      background: rgba(200, 169, 110, 0.04);
+    }
+
+    #lock-password::placeholder {
+      color: var(--color-text-dim);
+      letter-spacing: 0.25em;
+    }
+
+    #lock-submit {
+      width: 100%;
+      height: 44px;
+      background: transparent;
+      border: 1px solid var(--color-border);
+      border-top: none;
+      border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+      color: var(--color-accent);
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition:
+        border-color 200ms ease,
+        background   200ms ease;
+    }
+
+    #lock-submit:hover {
+      border-color: rgba(200, 169, 110, 0.35);
+      background: rgba(200, 169, 110, 0.06);
+    }
+
+    /* Spinner inside lock submit */
+    .lock-spinner {
+      display: none;
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid rgba(200, 169, 110, 0.20);
+      border-top-color: var(--color-accent);
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #lock-submit.loading .lock-btn-text { display: none; }
+    #lock-submit.loading .lock-spinner  { display: block; }
+
+    .lock-error {
+      margin-top: 14px;
+      text-align: center;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 0.06em;
+      color: var(--color-danger);
+      min-height: 16px;
+      transition: opacity 200ms ease;
+    }
+
+    .lock-idle-note {
+      margin-top: 32px;
+      font-family: var(--font-body);
+      font-size: 9px;
+      font-weight: 300;
+      letter-spacing: 0.18em;
+      color: var(--color-text-dim);
+      text-transform: uppercase;
+    }
+
+    /* Lock screen shake */
+    @keyframes lock-shake {
+      0%, 100% { transform: translateX(0); }
+      15%       { transform: translateX(-6px); }
+      30%       { transform: translateX(5px); }
+      45%       { transform: translateX(-4px); }
+      60%       { transform: translateX(3px); }
+      75%       { transform: translateX(-2px); }
+      90%       { transform: translateX(1px); }
+    }
+
+    .lock-form.shake {
+      animation: lock-shake 440ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+
+    /* ── Crosshair cursor ───────────────────────────────────────────────── */
+    #crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 16px;
+      pointer-events: none;
+      z-index: 15;
+      opacity: 0.25;
+      transition: opacity 200ms ease;
+    }
+
+    #crosshair line {
+      stroke: var(--color-accent);
+      stroke-width: 0.8;
+    }
+
+    body:not(.in-menu) #crosshair { opacity: 0.12; }
+
+    /* ── Transition-in animation ─────────────────────────────────────────── */
+    @keyframes world-reveal {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    #hud.visible {
+      animation: world-reveal 800ms ease both;
+    }
+
+    /* ── Noise grain over everything ────────────────────────────────────── */
+    #grain-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.028'/%3E%3C/svg%3E");
+      background-size: 256px 256px;
+      opacity: 0.55;
+      mix-blend-mode: overlay;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── WebGL canvas ─────────────────────────────────────────────────────── -->
+  <canvas id="atlas-canvas"></canvas>
+
+  <!-- ── World dim overlay ────────────────────────────────────────────────── -->
+  <div id="world-dim"></div>
+
+  <!-- ── Film grain over everything ───────────────────────────────────────── -->
+  <div id="grain-overlay"></div>
+
+  <!-- ── Loading screen ───────────────────────────────────────────────────── -->
+  <div id="loading-screen">
+    <div class="loading-wordmark">Atlas</div>
+    <div class="loading-bar-track">
+      <div class="loading-bar-fill" id="loading-bar"></div>
+    </div>
+    <div class="loading-label" id="loading-label">Waking the world</div>
+  </div>
+
+  <!-- ── Crosshair ────────────────────────────────────────────────────────── -->
+  <svg id="crosshair" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <line x1="8" y1="2"  x2="8"  y2="6"  />
+    <line x1="8" y1="10" x2="8"  y2="14" />
+    <line x1="2" y1="8"  x2="6"  y2="8"  />
+    <line x1="10" y1="8" x2="14" y2="8"  />
+  </svg>
+
+  <!-- ── HUD ──────────────────────────────────────────────────────────────── -->
+  <div id="hud">
+
+    <!-- 1. Zone indicator — top center -->
+    <div class="hud-el" id="hud-zone">
+      <div class="hud-zone-compass" id="hud-compass"></div>
+      <div class="hud-zone-name" id="hud-zone-name">The Center</div>
+    </div>
+
+    <!-- 2. Time & atmosphere — top right -->
+    <div class="hud-el" id="hud-time">
+      <div class="hud-time-icons" id="hud-atmo-icons">
+        <!-- Season icon (SVG injected by JS) -->
+        <svg class="hud-icon" id="hud-season-icon" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7" cy="7" r="3" stroke="#c8a96e" stroke-width="1.2"/>
+          <line x1="7" y1="1" x2="7" y2="2.5"   stroke="#c8a96e" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="7" y1="11.5" x2="7" y2="13" stroke="#c8a96e" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="1" y1="7" x2="2.5" y2="7"   stroke="#c8a96e" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="11.5" y1="7" x2="13" y2="7" stroke="#c8a96e" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <!-- Weather icon -->
+        <svg class="hud-icon" id="hud-weather-icon" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 9a3 3 0 1 1 2.4-4.8A2.5 2.5 0 1 1 10 9H4Z" stroke="#c8a96e" stroke-width="1.1" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="hud-time-clock" id="hud-clock">12:00</div>
+    </div>
+
+    <!-- 3. Quick log — bottom right -->
+    <div class="hud-el" id="hud-quicklog">
+
+      <!-- Journal -->
+      <button class="hud-quicklog-btn" id="hud-btn-journal" title="New journal entry" aria-label="New journal entry">
+        <svg viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"/>
+          <line x1="5" y1="5.5" x2="10" y2="5.5"/>
+          <line x1="5" y1="7.5" x2="10" y2="7.5"/>
+          <line x1="5" y1="9.5" x2="8"  y2="9.5"/>
+        </svg>
+      </button>
+
+      <!-- Habit -->
+      <button class="hud-quicklog-btn" id="hud-btn-habit" title="Check in habit" aria-label="Check in habit">
+        <svg viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7.5" cy="7.5" r="5.5"/>
+          <polyline points="5,7.5 7,9.5 10.5,5.5"/>
+        </svg>
+      </button>
+
+      <!-- Reading -->
+      <button class="hud-quicklog-btn" id="hud-btn-book" title="Log reading" aria-label="Log reading">
+        <div class="reading-progress-pip" id="reading-pip"></div>
+        <svg viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 2.5C3 2.5 5 2 7.5 3.5C10 2 12 2.5 12 2.5V12.5C12 12.5 10 12 7.5 13.5C5 12 3 12.5 3 12.5V2.5Z"/>
+          <line x1="7.5" y1="3.5" x2="7.5" y2="13.5"/>
+        </svg>
+      </button>
+
+      <!-- Finance -->
+      <button class="hud-quicklog-btn" id="hud-btn-finance" title="Log transaction" aria-label="Log transaction">
+        <div class="finance-pulse-pip" id="finance-pip"></div>
+        <svg viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7.5" cy="7.5" r="5.5"/>
+          <path d="M7.5 4.5v1M7.5 9.5v1M5.5 6.5a2 2 0 0 1 4 0c0 1-1 1.5-2 2s-2 1-2 2a2 2 0 0 0 4 0"/>
+        </svg>
+      </button>
+
+      <!-- Gaming -->
+      <button class="hud-quicklog-btn" id="hud-btn-gaming" title="Log gaming session" aria-label="Log gaming session">
+        <svg viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1.5" y="4.5" width="12" height="7" rx="2"/>
+          <line x1="5" y1="8" x2="7" y2="8"/>
+          <line x1="6" y1="7" x2="6" y2="9"/>
+          <circle cx="10" cy="7.5" r="0.7" fill="#c8a96e" stroke="none"/>
+          <circle cx="11.5" cy="9"  r="0.7" fill="#c8a96e" stroke="none"/>
+        </svg>
+      </button>
+
+    </div><!-- /#hud-quicklog -->
+
+    <!-- 4. Graph access — bottom left -->
+    <div class="hud-el" id="hud-graphs">
+      <button class="hud-graph-btn" id="hud-btn-graphs" title="View graphs" aria-label="View graphs">
+        <svg viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
+          <polyline points="2,12 5,7 8,9 11,4 13,6"/>
+          <line x1="2" y1="12" x2="13" y2="12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- 5. User — top left -->
+    <div class="hud-el" id="hud-user">
+      <div class="hud-avatar" id="hud-avatar" title="Settings" role="button" tabindex="0" aria-label="Open settings">T</div>
+    </div>
+
+    <!-- Navigation edge labels (8) -->
+    <!-- Populated by JS based on zone layout -->
+    <div class="hud-nav-edge" id="nav-top"    data-zone="grove"    style="opacity:0">Grove</div>
+    <div class="hud-nav-edge" id="nav-bottom" data-zone="garden"   style="opacity:0">Garden</div>
+    <div class="hud-nav-edge" id="nav-left"   data-zone="treasury" style="opacity:0">Treasury</div>
+    <div class="hud-nav-edge" id="nav-right"  data-zone="gaming"   style="opacity:0">Archive</div>
+
+  </div><!-- /#hud -->
+
+  <!-- ── Settings panel ───────────────────────────────────────────────────── -->
+  <div id="settings-panel" role="dialog" aria-label="Settings">
+    <div>
+      <div class="settings-label">Signed in as</div>
+      <div class="settings-value" id="settings-email">tanim97@proton.me</div>
+    </div>
+    <div class="settings-divider"></div>
+    <div>
+      <div class="settings-label">GPU tier</div>
+      <div class="settings-value" id="settings-gpu">—</div>
+    </div>
+    <div>
+      <div class="settings-label">Frame rate</div>
+      <div class="settings-value" id="settings-fps">60 fps</div>
+    </div>
+    <div class="settings-divider"></div>
+    <button class="settings-btn" id="settings-logout">Sign out of Atlas</button>
+  </div>
+
+  <!-- ── Lock screen — Layer 5 ────────────────────────────────────────────── -->
+  <div id="lock-screen" role="dialog" aria-modal="true" aria-label="Atlas is locked">
+
+    <div class="lock-wordmark">Atlas</div>
+    <div class="lock-subtitle">Session locked</div>
+
+    <div class="lock-form" id="lock-form">
+      <div class="lock-input-wrap">
+        <input
+          type="password"
+          id="lock-password"
+          placeholder="· · · · · · · ·"
+          autocomplete="current-password"
+          aria-label="Enter passphrase to unlock"
+        />
+      </div>
+      <button id="lock-submit" type="button">
+        <span class="lock-btn-text">Unlock</span>
+        <span class="lock-spinner"></span>
+      </button>
+    </div>
+
+    <div class="lock-error" id="lock-error" role="alert" aria-live="polite"></div>
+    <div class="lock-idle-note">Session locked after 30 minutes of inactivity</div>
+
+  </div>
+
+  <!-- DevTools warning (Layer 9) -->
+  <script>
+    console.log('%cATLAS', 'font-size:52px;color:#c8a96e;font-weight:300;font-family:Georgia,serif;letter-spacing:0.2em;');
+    console.log('%cThe Living World', 'font-size:13px;color:#6a6058;font-family:Georgia,serif;letter-spacing:0.15em;');
+    console.log('%cPrivate application. All access is logged. Data protected by row-level security.', 'font-size:11px;color:#3a342c;');
+  </script>
+
+  <!-- ── Bootstrap ────────────────────────────────────────────────────────── -->
+  <script type="module">
+    import { CONFIG }             from './core/config.js';
+    import { state }              from './core/state.js';
+    import { restoreSession,
+             logout,
+             unlockScreen,
+             resetInactivityTimer } from './core/auth.js';
+
+    // ── Auth guard ────────────────────────────────────────────────────────
+    const sessionValid = await restoreSession();
+    if (!sessionValid) {
+      window.location.href = '/index.html';
+      throw new Error('No valid session — redirecting.');
+    }
+
+    // ── Loading progress helper ───────────────────────────────────────────
+    const loadingBar   = document.getElementById('loading-bar');
+    const loadingLabel = document.getElementById('loading-label');
+    const loadingScreen = document.getElementById('loading-screen');
+
+    const LOAD_STAGES = [
+      [10,  'Sculpting terrain'],
+      [22,  'Painting the sky'],
+      [36,  'Planting the garden'],
+      [50,  'Growing the grove'],
+      [62,  'Forming crystals'],
+      [74,  'Stocking the library'],
+      [83,  'Filling the river'],
+      [91,  'Charging the archive'],
+      [100, 'The world is alive'],
+    ];
+
+    let stageIndex = 0;
+
+    window.atlasLoadProgress = function(pct) {
+      loadingBar.style.width = pct + '%';
+      // Advance label to the next stage threshold
+      while (stageIndex < LOAD_STAGES.length && pct >= LOAD_STAGES[stageIndex][0]) {
+        loadingLabel.textContent = LOAD_STAGES[stageIndex][1];
+        stageIndex++;
+      }
+    };
+
+    window.atlasLoadComplete = function() {
+      loadingBar.style.width = '100%';
+      loadingLabel.textContent = 'The world is alive';
+      setTimeout(() => {
+        loadingScreen.classList.add('fade-out');
+        setTimeout(() => {
+          loadingScreen.style.display = 'none';
+          document.getElementById('hud').classList.add('visible');
+          _initNavEdges();
+          _updateHudFromState();
+        }, 820);
+      }, 400);
+    };
+
+    // ── HUD clock ─────────────────────────────────────────────────────────
+    function _updateClock() {
+      const now  = new Date();
+      const h    = String(now.getHours()).padStart(2, '0');
+      const m    = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('hud-clock').textContent = `${h}:${m}`;
+    }
+    _updateClock();
+    setInterval(_updateClock, 30_000);
+
+    // ── HUD zone name ─────────────────────────────────────────────────────
+    const ZONE_DISPLAY = {
+      center:   'The Center',
+      garden:   'The Garden',
+      grove:    'The Grove',
+      crystals: 'Crystal Field',
+      library:  'Library Alcove',
+      treasury: 'The Treasury',
+      gaming:   'Gaming Archive',
+    };
+
+    window.atlasSetZone = function(zoneKey) {
+      const el = document.getElementById('hud-zone-name');
+      if (el) el.textContent = ZONE_DISPLAY[zoneKey] ?? zoneKey;
+      _updateNavEdges(zoneKey);
+    };
+
+    // ── HUD state sync ────────────────────────────────────────────────────
+    function _updateHudFromState() {
+      // Reading pip — show if a book is currently being read
+      const reading = state.books.find(b => b.status === 'reading');
+      document.getElementById('reading-pip').style.display = reading ? 'block' : 'none';
+
+      // Financial pip color from health score
+      const pip = document.getElementById('finance-pip');
+      pip.style.display = 'block';
+      const h = state.financialHealth;
+      pip.style.background = h >= 0.65 ? '#4a8c5c'
+                           : h >= 0.40 ? '#c8a96e'
+                           : '#c87060';
+
+      // Settings GPU tier
+      document.getElementById('settings-gpu').textContent =
+        state.gpuTier.charAt(0).toUpperCase() + state.gpuTier.slice(1);
+    }
+
+    // ── Nav edge labels ───────────────────────────────────────────────────
+    const ZONE_NEIGHBORS = {
+      center:   { top: 'Grove', bottom: 'Garden', left: 'Treasury', right: 'Archive' },
+      garden:   { top: 'Center', bottom: null,     left: 'Treasury', right: 'Archive' },
+      grove:    { top: null,     bottom: 'Center', left: 'Treasury', right: 'Crystals' },
+      crystals: { top: null,     bottom: 'Center', left: 'Grove',    right: null },
+      library:  { top: null,     bottom: 'Crystals', left: null,     right: null },
+      treasury: { top: 'Grove',  bottom: 'Garden',  left: null,      right: 'Center' },
+      gaming:   { top: null,     bottom: 'Garden',  left: 'Center',  right: null },
+    };
+
+    function _initNavEdges() {
+      ['nav-top','nav-bottom','nav-left','nav-right'].forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('click', () => {
+          const zone = el.dataset.zone;
+          if (zone && window.atlasNavigateTo) window.atlasNavigateTo(zone);
+        });
+      });
+    }
+
+    function _updateNavEdges(zoneKey) {
+      const neighbors = ZONE_NEIGHBORS[zoneKey] ?? {};
+      const map = {
+        'nav-top':    ['grove',    neighbors.top],
+        'nav-bottom': ['garden',   neighbors.bottom],
+        'nav-left':   ['treasury', neighbors.left],
+        'nav-right':  ['gaming',   neighbors.right],
+      };
+
+      Object.entries(map).forEach(([id, [defaultZone, label]]) => {
+        const el = document.getElementById(id);
+        if (!label) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+        } else {
+          el.style.opacity = '';
+          el.style.pointerEvents = '';
+          el.textContent = label;
+          // Map label back to zone key for navigation
+          const zoneByLabel = Object.entries(ZONE_DISPLAY)
+            .find(([, v]) => v.toLowerCase().includes(label.toLowerCase()));
+          el.dataset.zone = zoneByLabel ? zoneByLabel[0] : defaultZone;
+        }
+      });
+    }
+
+    // ── Settings panel ────────────────────────────────────────────────────
+    const settingsPanel = document.getElementById('settings-panel');
+    const avatar        = document.getElementById('hud-avatar');
+
+    function openSettings() {
+      settingsPanel.style.display = 'flex';
+      requestAnimationFrame(() => settingsPanel.classList.add('open'));
+    }
+
+    function closeSettings() {
+      settingsPanel.classList.remove('open');
+      setTimeout(() => { settingsPanel.style.display = 'none'; }, 280);
+    }
+
+    avatar.addEventListener('click', () => {
+      settingsPanel.classList.contains('open') ? closeSettings() : openSettings();
+    });
+
+    avatar.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        settingsPanel.classList.contains('open') ? closeSettings() : openSettings();
+      }
+    });
+
+    // Close on outside click
+    document.addEventListener('click', e => {
+      if (!settingsPanel.contains(e.target) && e.target !== avatar) {
+        if (settingsPanel.classList.contains('open')) closeSettings();
+      }
+    });
+
+    document.getElementById('settings-logout').addEventListener('click', () => {
+      logout();
+    });
+
+    // FPS counter update (called by render loop)
+    window.atlasSetFps = function(fps) {
+      document.getElementById('settings-fps').textContent = `${fps} fps`;
+    };
+
+    // ── Lock screen ───────────────────────────────────────────────────────
+    const lockPasswordInput = document.getElementById('lock-password');
+    const lockSubmitBtn     = document.getElementById('lock-submit');
+    const lockError         = document.getElementById('lock-error');
+    const lockForm          = document.getElementById('lock-form');
+
+    // Listen for lock / unlock events from auth.js
+    window.addEventListener('atlas:lock', () => {
+      document.getElementById('world-dim').classList.add('dimmed');
+    });
+
+    window.addEventListener('atlas:unlock', () => {
+      document.getElementById('world-dim').classList.remove('dimmed');
+      lockError.textContent = '';
+    });
+
+    async function handleUnlock() {
+      const password = lockPasswordInput.value;
+      if (!password.trim()) {
+        lockError.textContent = 'Please enter your passphrase.';
+        return;
+      }
+
+      lockError.textContent = '';
+      lockSubmitBtn.classList.add('loading');
+      lockSubmitBtn.disabled = true;
+
+      const { error } = await unlockScreen(password);
+
+      lockSubmitBtn.classList.remove('loading');
+      lockSubmitBtn.disabled = false;
+
+      if (error) {
+        lockError.textContent = error;
+        lockPasswordInput.value = '';
+        lockPasswordInput.focus();
+        lockForm.classList.remove('shake');
+        void lockForm.offsetWidth;
+        lockForm.classList.add('shake');
+        lockForm.addEventListener('animationend', () => {
+          lockForm.classList.remove('shake');
+        }, { once: true });
+      } else {
+        lockPasswordInput.value = '';
+        _updateHudFromState();
+      }
+    }
+
+    lockSubmitBtn.addEventListener('click', handleUnlock);
+    lockPasswordInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleUnlock();
+    });
+    lockPasswordInput.addEventListener('input', () => {
+      lockError.textContent = '';
+    });
+
+    // ── Inactivity tracking ───────────────────────────────────────────────
+    // Every meaningful user interaction resets the 30-minute timer.
+    const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart'];
+    let activityThrottle = null;
+
+    function onActivity() {
+      if (activityThrottle) return;
+      activityThrottle = setTimeout(() => {
+        activityThrottle = null;
+        resetInactivityTimer();
+      }, 10_000);   // throttle: at most once per 10 seconds
+    }
+
+    ACTIVITY_EVENTS.forEach(ev => {
+      window.addEventListener(ev, onActivity, { passive: true });
+    });
+
+    // ── Quick log buttons — navigate to zone + open panel ─────────────────
+    // These dispatch zone navigation events; the actual panels open in Segments
+    // 4–9 when the zone modules are loaded. For Segment 1 they are wired up
+    // but silently no-op until the world scene exists.
+
+    function dispatchQuickLog(action) {
+      window.dispatchEvent(new CustomEvent('atlas:quicklog', { detail: { action } }));
+    }
+
+    document.getElementById('hud-btn-journal').addEventListener('click',  () => dispatchQuickLog('journal'));
+    document.getElementById('hud-btn-habit').addEventListener('click',    () => dispatchQuickLog('habit'));
+    document.getElementById('hud-btn-book').addEventListener('click',     () => dispatchQuickLog('book'));
+    document.getElementById('hud-btn-finance').addEventListener('click',  () => dispatchQuickLog('finance'));
+    document.getElementById('hud-btn-gaming').addEventListener('click',   () => dispatchQuickLog('gaming'));
+    document.getElementById('hud-btn-graphs').addEventListener('click',   () => dispatchQuickLog('graphs'));
+
+    // ── Lazy-load the world scene ─────────────────────────────────────────
+    // Scene bootstrap lives in world/scene.js (Segment 2).
+    // It expects THREE to be on window (loaded via CDN above) and
+    // window.atlasLoadProgress / window.atlasLoadComplete to be present.
+    // The dynamic import is deferred so the auth check completes first.
+
+    import('./world/scene.js').catch(err => {
+      // scene.js doesn't exist yet (Segment 1 only) — swallow gracefully.
+      console.info('[Atlas] World scene not yet built. Segment 2 will wire this up.');
+      // Simulate loading complete so the HUD appears for testing
+      setTimeout(() => window.atlasLoadComplete(), 800);
+    });
+
+  </script>
+
+</body>
+</html>
