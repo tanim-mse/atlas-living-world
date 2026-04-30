@@ -42,7 +42,9 @@ let _rtBloomV   = null;   // vertical bloom blur
 let _rtComposite= null;   // ACES + LUT + vignette + CA + grain
 
 // Full-screen quad used for all post passes
-let _fsQuad     = null;
+let _fsQuad      = null;
+let _fsScene     = null;
+let _orthoCamera = null;
 
 // Post-processing shader materials (one per pass)
 let _ssaoMat      = null;
@@ -464,10 +466,12 @@ function _buildCompositeMaterial() {
 // ─── Full-Screen Quad ─────────────────────────────────────────────────────────
 
 function _buildFullScreenQuad() {
-  const geo  = new THREE.PlaneGeometry(2, 2);
-  const mat  = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  _fsQuad    = new THREE.Mesh(geo, mat);
-  // We swap .material per pass before rendering
+  const geo    = new THREE.PlaneGeometry(2, 2);
+  const mat    = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  _fsQuad      = new THREE.Mesh(geo, mat);
+  _fsScene     = new THREE.Scene();
+  _fsScene.add(_fsQuad);
+  _orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 }
 
 // ─── Render Loop ──────────────────────────────────────────────────────────────
@@ -566,28 +570,12 @@ function _renderPasses(elapsed) {
 
 /** Render a full-screen quad with given material into target (null = screen). */
 function _renderFSQ(material, target) {
+  _fsQuad.material = material;
   _renderer.setRenderTarget(target);
   _renderer.clear(true, false, false);
-  _fsQuad.material = material;
-
-  // Temporarily use an orthographic camera for the quad
-  const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  _renderer.render(_wrapQuad(_fsQuad), ortho);
+  _renderer.render(_fsScene, _orthoCamera);
 }
 
-/** Wrap a single mesh into a minimal scene for FSQ rendering. */
-let _fsScene = null;
-function _wrapQuad(mesh) {
-  if (!_fsScene) {
-    _fsScene = new THREE.Scene();
-    _fsScene.add(mesh);
-  }
-  if (!_fsScene.children.includes(mesh)) {
-    _fsScene.clear();
-    _fsScene.add(mesh);
-  }
-  return _fsScene;
-}
 
 // ─── Camera Update ────────────────────────────────────────────────────────────
 
@@ -718,6 +706,7 @@ function _disposeFullScreenQuad() {
     _fsScene.clear();
     _fsScene = null;
   }
+  _orthoCamera = null;
 }
 
 // ─── GLSL — Full-Screen Vertex Shader ────────────────────────────────────────
