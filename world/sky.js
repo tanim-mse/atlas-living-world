@@ -400,7 +400,7 @@ function _buildStarField() {
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position',  new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color',     new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('aColor',    new THREE.BufferAttribute(colors, 3));
   geo.setAttribute('size',      new THREE.BufferAttribute(sizes, 1));
   geo.setAttribute('aPhase',    new THREE.BufferAttribute(phases, 1));
 
@@ -411,6 +411,7 @@ function _buildStarField() {
       uIsNight:    { value: 0.0 },
     },
     vertexShader: /* glsl */`
+      attribute vec3  aColor;
       attribute float size;
       attribute float aPhase;
       varying vec3  vColor;
@@ -419,12 +420,11 @@ function _buildStarField() {
       uniform float uNightBlend;
 
       void main() {
-        vColor = color;
+        vColor = aColor;
         vPhase = aPhase;
         vSize  = size;
 
         vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-        // Point size: scale with distance so stars stay crisp at any FOV
         gl_PointSize = size * (800.0 / -mvPos.z) * uNightBlend;
         gl_Position  = projectionMatrix * mvPos;
       }
@@ -438,22 +438,16 @@ function _buildStarField() {
       varying float vSize;
 
       void main() {
-        // Circular point — discard outside unit circle
         vec2  pc   = gl_PointCoord - 0.5;
         float dist = length(pc);
         if (dist > 0.5) discard;
 
-        // Soft disc edge
         float alpha = 1.0 - smoothstep(0.30, 0.50, dist);
 
-        // Atmospheric scintillation: multi-frequency oscillation per star
-        // Fast component (thermal turbulence) + slow component (seeing)
         float twinkle = 0.85
           + 0.10 * sin(uTime * 3.8 + vPhase)
           + 0.05 * sin(uTime * 7.1 + vPhase * 2.3);
 
-        // Scintillation is stronger for smaller (dimmer) stars and
-        // suppressed for very large (bright) stars
         float scintillationStrength = 1.0 - smoothstep(1.0, 2.5, vSize);
         float brightness = mix(1.0, twinkle, scintillationStrength * 0.7);
 
@@ -461,7 +455,6 @@ function _buildStarField() {
         gl_FragColor = vec4(col * alpha, alpha * uNightBlend);
       }
     `,
-    vertexColors:  true,
     transparent:   true,
     depthWrite:    false,
     blending:      THREE.AdditiveBlending,
@@ -524,7 +517,7 @@ function _buildMilkyWay() {
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('aColor',   new THREE.BufferAttribute(colors, 3));
   geo.setAttribute('size',     new THREE.BufferAttribute(sizes, 1));
 
   const mat = new THREE.ShaderMaterial({
@@ -532,11 +525,12 @@ function _buildMilkyWay() {
       uNightBlend: { value: 0.0 },
     },
     vertexShader: /* glsl */`
+      attribute vec3  aColor;
       attribute float size;
       varying vec3  vColor;
       uniform float uNightBlend;
       void main() {
-        vColor = color;
+        vColor = aColor;
         vec4 mvPos   = modelViewMatrix * vec4(position, 1.0);
         gl_PointSize = size * (600.0 / -mvPos.z) * uNightBlend;
         gl_Position  = projectionMatrix * mvPos;
@@ -554,7 +548,6 @@ function _buildMilkyWay() {
         gl_FragColor = vec4(vColor, a);
       }
     `,
-    vertexColors: true,
     transparent:  true,
     depthWrite:   false,
     blending:     THREE.AdditiveBlending,
