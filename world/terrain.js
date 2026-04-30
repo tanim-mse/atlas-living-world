@@ -736,6 +736,8 @@ function _vsTerrainGLSL() {
      *   vSlope       — dot(normal, up) — 1=flat, 0=vertical
      *   vHeight      — world-space Y, used for snow cap blend in fragment
      */
+    precision highp float;
+
     varying vec3  vWorldPos;
     varying vec3  vWorldNormal;
     varying vec2  vUv;
@@ -779,8 +781,7 @@ function _fsTerrainGLSL() {
      *
      * All uniforms documented in _buildMaterial().
      */
-    precision mediump float;
-
+precision highp float;
     // ── Textures ──────────────────────────────────────────────────────────────
     uniform sampler2D uSplatmap;
     uniform sampler2D uDetailNormal;
