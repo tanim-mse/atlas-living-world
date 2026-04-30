@@ -1168,24 +1168,27 @@
     document.getElementById('hud-btn-gaming').addEventListener('click',   () => dispatchQuickLog('gaming'));
     document.getElementById('hud-btn-graphs').addEventListener('click',   () => dispatchQuickLog('graphs'));
 
-    // ── World initialisation — Segment 2 ─────────────────────────────────
-    // Imports scene.js, terrain.js, and lighting.js then calls their init
-    // functions in dependency order:
+    // ── World initialisation — Segment 2 + 3 ────────────────────────────
+    // Imports scene.js, terrain.js, lighting.js, and sky.js then calls
+    // their init functions in dependency order:
     //   1. initScene()   — renderer, camera, post-processing, render loop
     //   2. initTerrain() — heightmap, LOD meshes, splatmap
     //   3. initLighting()— sun, moon, hemisphere, zone fills
-    // Both terrain and lighting register their per-frame update callbacks
-    // via registerUpdate() so the render loop drives them automatically.
+    //   4. initSky()     — atmosphere dome, clouds, stars, rain, weather
+    // All modules register their per-frame update callbacks via
+    // registerUpdate() so the render loop drives them automatically.
 
     try {
       const [
         { initScene, registerUpdate, getScene, getCamera, getRenderer },
         { initTerrain, updateTerrain },
         { initLighting, updateLighting },
+        { initSky },
       ] = await Promise.all([
         import('./world/scene.js'),
         import('./world/terrain.js'),
         import('./world/lighting.js'),
+        import('./world/sky.js'),
       ]);
 
       // Progress: modules loaded
@@ -1207,6 +1210,12 @@
       // Register per-frame updates into the render loop
       registerUpdate(updateTerrain);
       registerUpdate(updateLighting);
+
+      // 4. Sky — atmosphere dome, clouds, stars, rain, weather state machine
+      //    Must run after initScene() (needs renderer + scene) and after
+      //    initLighting() (shares sun direction with lighting.js).
+      await initSky();
+      window.atlasLoadProgress(82);
 
       // Ground camera to terrain height at start position
       const { getHeightAt } = await import('./world/terrain.js');
