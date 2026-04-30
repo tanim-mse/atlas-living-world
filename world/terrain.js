@@ -150,7 +150,6 @@ export function updateTerrain(delta, elapsed) {
     const u = _terrainMat.uniforms;
     u.uTime.value        = elapsed;
     u.uWetness.value     = state.wetness;
-    u.uCameraPos.value.set(state.camera.x, state.camera.y, state.camera.z);
     u.uSunDir.value.set(
       state.sunDirection.x,
       state.sunDirection.y,
@@ -556,7 +555,6 @@ function _buildMaterial() {
       // Environment
       uTime:             { value: 0.0 },
       uWetness:          { value: 0.0 },
-      uCameraPos:        { value: new THREE.Vector3() },
       uSunDir:           { value: new THREE.Vector3(0, 1, 0) },
       uSunColor:         { value: new THREE.Vector3(1, 0.95, 0.88) },
       uIsNight:          { value: 0.0 },
@@ -745,7 +743,6 @@ function _vsTerrainGLSL() {
     varying float vSlope;
     varying float vHeight;
 
-    uniform vec3  uCameraPos;
     uniform float uWorldSize;
     uniform float uLODMorphFactor;
 
@@ -754,7 +751,7 @@ function _vsTerrainGLSL() {
       vWorldPos       = worldPos.xyz;
       vWorldNormal    = normalize(mat3(modelMatrix) * normal);
       vUv             = uv;
-      vCamDist        = distance(worldPos.xyz, uCameraPos);
+      vCamDist        = distance(worldPos.xyz, cameraPosition);
       vSlope          = clamp(dot(vWorldNormal, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
       vHeight         = worldPos.y;
 
@@ -805,7 +802,6 @@ function _fsTerrainGLSL() {
     // ── Environment ───────────────────────────────────────────────────────────
     uniform float uTime;
     uniform float uWetness;
-    uniform vec3  uCameraPos;
     uniform vec3  uSunDir;
     uniform vec3  uSunColor;
     uniform float uIsNight;
@@ -928,7 +924,7 @@ function _fsTerrainGLSL() {
 
       vec3 L        = normalize(uSunDir);
       vec3 N        = worldNormal;
-      vec3 V        = normalize(uCameraPos - vWorldPos);
+      vec3 V        = normalize(cameraPosition - vWorldPos);
       vec3 H        = normalize(L + V);
 
       float NdotL   = max(dot(N, L), 0.0);
