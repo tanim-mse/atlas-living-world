@@ -738,25 +738,16 @@ function _vsTerrainGLSL() {
      *   vSlope       — dot(normal, up) — 1=flat, 0=vertical
      *   vHeight      — world-space Y, used for snow cap blend in fragment
      */
-    precision highp float;
-
-    attribute vec3 position;
-    attribute vec3 normal;
-    attribute vec2 uv;
-
-    uniform mat4 modelMatrix;
-    uniform mat4 modelViewMatrix;
-    uniform mat4 projectionMatrix;
-    uniform vec3 uCameraPos;
-    uniform float uWorldSize;
-    uniform float uLODMorphFactor;
-
     varying vec3  vWorldPos;
     varying vec3  vWorldNormal;
     varying vec2  vUv;
     varying float vCamDist;
     varying float vSlope;
     varying float vHeight;
+
+    uniform vec3  uCameraPos;
+    uniform float uWorldSize;
+    uniform float uLODMorphFactor;
 
     void main() {
       vec4 worldPos   = modelMatrix * vec4(position, 1.0);

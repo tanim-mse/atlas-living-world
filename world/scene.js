@@ -713,9 +713,6 @@ function _disposeFullScreenQuad() {
 
 function _vsFullScreen() {
   return /* glsl */`
-    precision highp float;
-    attribute vec3 position;
-    attribute vec2 uv;
     varying vec2 vUv;
     void main() {
       vUv = uv;
@@ -927,7 +924,7 @@ function _fsComposite() {
     uniform sampler2D uScene;
     uniform sampler2D uSSAO;
     uniform sampler2D uBloom;
-    uniform sampler3D uLUT;
+    uniform highp sampler3D uLUT;
     uniform float     uLUTSize;
     uniform vec2      uResolution;
     uniform float     uTime;
