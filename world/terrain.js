@@ -711,9 +711,10 @@ function _buildTerrainMesh(res, level) {
 let _dummyCamera = null;
 function _buildDummyCamera() {
   if (!_dummyCamera) {
-    _dummyCamera = { position: new THREE.Vector3() };
+    _dummyCamera = new THREE.PerspectiveCamera();
   }
   _dummyCamera.position.set(state.camera.x, state.camera.y, state.camera.z);
+  _dummyCamera.updateMatrixWorld();
   return _dummyCamera;
 }
 
