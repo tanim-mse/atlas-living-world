@@ -1168,18 +1168,61 @@
     document.getElementById('hud-btn-gaming').addEventListener('click',   () => dispatchQuickLog('gaming'));
     document.getElementById('hud-btn-graphs').addEventListener('click',   () => dispatchQuickLog('graphs'));
 
-    // ── Lazy-load the world scene ─────────────────────────────────────────
-    // Scene bootstrap lives in world/scene.js (Segment 2).
-    // It expects THREE to be on window (loaded via CDN above) and
-    // window.atlasLoadProgress / window.atlasLoadComplete to be present.
-    // The dynamic import is deferred so the auth check completes first.
+    // ── World initialisation — Segment 2 ─────────────────────────────────
+    // Imports scene.js, terrain.js, and lighting.js then calls their init
+    // functions in dependency order:
+    //   1. initScene()   — renderer, camera, post-processing, render loop
+    //   2. initTerrain() — heightmap, LOD meshes, splatmap
+    //   3. initLighting()— sun, moon, hemisphere, zone fills
+    // Both terrain and lighting register their per-frame update callbacks
+    // via registerUpdate() so the render loop drives them automatically.
 
-    import('./world/scene.js').catch(err => {
-      // scene.js doesn't exist yet (Segment 1 only) — swallow gracefully.
-      console.info('[Atlas] World scene not yet built. Segment 2 will wire this up.');
-      // Simulate loading complete so the HUD appears for testing
-      setTimeout(() => window.atlasLoadComplete(), 800);
-    });
+    try {
+      const [
+        { initScene, registerUpdate, getScene, getCamera, getRenderer },
+        { initTerrain, updateTerrain },
+        { initLighting, updateLighting },
+      ] = await Promise.all([
+        import('./world/scene.js'),
+        import('./world/terrain.js'),
+        import('./world/lighting.js'),
+      ]);
+
+      // Progress: modules loaded
+      window.atlasLoadProgress(10);
+
+      // 1. Renderer, camera, post-processing, render loop
+      await initScene();
+      window.atlasLoadProgress(22);
+
+      // 2. Terrain — heightmap generation is CPU-side and takes ~200ms
+      const scene = getScene();
+      await initTerrain(scene);
+      window.atlasLoadProgress(50);
+
+      // 3. Lighting — depends on terrain for getHeightAt() in zone fills
+      initLighting(scene);
+      window.atlasLoadProgress(62);
+
+      // Register per-frame updates into the render loop
+      registerUpdate(updateTerrain);
+      registerUpdate(updateLighting);
+
+      // Ground camera to terrain height at start position
+      const { getHeightAt } = await import('./world/terrain.js');
+      const groundY = getHeightAt(state.camera.x, state.camera.z);
+      state.camera.y       = groundY + 1.72;
+      state.camera.targetY = state.camera.y;
+
+      window.atlasLoadProgress(100);
+      window.atlasLoadComplete();
+
+    } catch (err) {
+      console.error('[Atlas] World initialisation failed:', err);
+      // Show error in loading label so it's visible without opening DevTools
+      const lbl = document.getElementById('loading-label');
+      if (lbl) lbl.textContent = 'Init error — see console (F12)';
+    }
 
   </script>
 
