@@ -185,31 +185,56 @@ async function _loadShaders() {
 }
 
 /**
+ * Strip the leading JSDoc-style header comment block from a shader source
+ * file.  The GLSL files in this project all begin with a `/** ... *​/`
+ * documentation block that contains references to the sentinel markers
+ * (`// === VERTEX ===`, `// === FRAGMENT ===`, etc.) for human readers.
+ * If we don't strip the header first, indexOf() finds those references
+ * inside the comment and slices the wrong region — producing garbage
+ * shader source whose first non-whitespace character is a `*` from the
+ * comment block.  Hence the cryptic "ERROR: 0:62: '*' : syntax error".
+ */
+function _stripHeaderComment(src) {
+  // Match a leading /* ... */ block (with optional whitespace before it)
+  const match = src.match(/^\s*\/\*[\s\S]*?\*\//);
+  if (!match) return src;
+  return src.slice(match[0].length);
+}
+
+/**
  * Split a shader source file on a sentinel comment line.
  * Returns { vertex, fragment } strings.
  * Works for atmosphere.glsl (// === VERTEX === / // === FRAGMENT ===).
+ *
+ * The leading JSDoc header is stripped first to prevent sentinels inside
+ * documentation comments from being matched.
  */
 function _splitShader(src, vertexSentinel, fragmentSentinel) {
-  const vIdx = src.indexOf(vertexSentinel);
-  const fIdx = src.indexOf(fragmentSentinel);
+  const code = _stripHeaderComment(src);
+  const vIdx = code.indexOf(vertexSentinel);
+  const fIdx = code.indexOf(fragmentSentinel);
   if (vIdx === -1 || fIdx === -1) {
     throw new Error(`[Sky] Missing sentinels "${vertexSentinel}" / "${fragmentSentinel}"`);
   }
-  const vertex   = src.slice(vIdx + vertexSentinel.length, fIdx).trim();
-  const fragment = src.slice(fIdx + fragmentSentinel.length).trim();
+  const vertex   = code.slice(vIdx + vertexSentinel.length, fIdx).trim();
+  const fragment = code.slice(fIdx + fragmentSentinel.length).trim();
   return { vertex, fragment };
 }
 
 /**
  * Extract a named shader block from rain.glsl.
  * Rain file has 6 sentinels; each block runs until the next sentinel.
+ *
+ * The leading JSDoc header is stripped first to prevent sentinels inside
+ * documentation comments from being matched.
  */
 function _extractRainShader(src, startSentinel, endSentinel) {
-  const start = src.indexOf(startSentinel);
+  const code  = _stripHeaderComment(src);
+  const start = code.indexOf(startSentinel);
   if (start === -1) throw new Error(`[Sky] Missing rain sentinel "${startSentinel}"`);
   const contentStart = start + startSentinel.length;
-  const end = endSentinel ? src.indexOf(endSentinel, contentStart) : src.length;
-  return src.slice(contentStart, end === -1 ? undefined : end).trim();
+  const end = endSentinel ? code.indexOf(endSentinel, contentStart) : code.length;
+  return code.slice(contentStart, end === -1 ? undefined : end).trim();
 }
 
 // ─── Full-screen quad (mirrors scene.js pattern exactly) ─────────────────────
@@ -411,6 +436,7 @@ function _buildStarField() {
       uIsNight:    { value: 0.0 },
     },
     vertexShader: /* glsl */`
+      precision highp float;
       attribute vec3  aColor;
       attribute float size;
       attribute float aPhase;
@@ -430,7 +456,7 @@ function _buildStarField() {
       }
     `,
     fragmentShader: /* glsl */`
-      precision mediump float;
+      precision highp float;
       uniform float uTime;
       uniform float uNightBlend;
       varying vec3  vColor;
@@ -525,6 +551,7 @@ function _buildMilkyWay() {
       uNightBlend: { value: 0.0 },
     },
     vertexShader: /* glsl */`
+      precision highp float;
       attribute vec3  aColor;
       attribute float size;
       varying vec3  vColor;
@@ -537,7 +564,7 @@ function _buildMilkyWay() {
       }
     `,
     fragmentShader: /* glsl */`
-      precision mediump float;
+      precision highp float;
       uniform float uNightBlend;
       varying vec3  vColor;
       void main() {
@@ -613,7 +640,7 @@ function _buildTAAPass() {
     },
     vertexShader: _vsFullScreen(),
     fragmentShader: /* glsl */`
-      precision mediump float;
+      precision highp float;
       uniform sampler2D uCurrent;
       uniform sampler2D uHistory;
       uniform vec2      uResolution;
@@ -824,7 +851,7 @@ function _buildGodRayPass() {
        * Based on Crytek 2007 technique (Shafts of Light, GPU Gems 3 Ch. 13).
        * NUM_SAMPLES reduced to 60 for RTX 2050 performance at half resolution.
        */
-      precision mediump float;
+      precision highp float;
 
       uniform sampler2D uSceneTex;
       uniform vec2      uSunPos;       // sun screen UV [0,1]
@@ -878,7 +905,7 @@ function _buildGodRayPass() {
     },
     vertexShader: _vsFullScreen(),
     fragmentShader: /* glsl */`
-      precision mediump float;
+      precision highp float;
       uniform sampler2D uBase;
       uniform sampler2D uGodRays;
       uniform float     uStrength;
@@ -1525,6 +1552,7 @@ function _haltonBase(index, base) {
 
 function _vsFullScreen() {
   return /* glsl */`
+    precision highp float;
     varying vec2 vUv;
     void main() {
       vUv         = uv;
