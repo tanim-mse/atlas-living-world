@@ -389,7 +389,7 @@ void main() {
   float vigDist   = length(centre * vec2(aspect, 1.0));
   float vignette  = smoothstep(uVigStrength, uVigStrength - uVigSoftness, vigDist);
   vignette        = pow(vignette, 1.2);
-  ldr            *= mix(0.85, 1.0, vignette);
+  ldr            *= mix(0.96, 1.0, vignette);
 
   // ──────────────────────────────────────────────────────────────────────────
   // 9. FILM GRAIN
