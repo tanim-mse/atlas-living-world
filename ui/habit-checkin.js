@@ -80,8 +80,7 @@
  */
 
 import { state }    from '../core/state.js';
-import { supabase } from '../core/supabase.js';
-
+import { db as supabase } from '../core/supabase.js';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 // Mirror Atlas design system exactly — same values as :root in ui.css
 

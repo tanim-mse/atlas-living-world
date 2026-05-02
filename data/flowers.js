@@ -1248,8 +1248,6 @@ function _habitPosition(habit) {
   return { x, z };
 }
 
-const GARDEN_CENTER_X = CONFIG.ZONES.garden.x;
-const GARDEN_CENTER_Z = CONFIG.ZONES.garden.z;
 
 // ─── Growth helpers ───────────────────────────────────────────────────────────
 

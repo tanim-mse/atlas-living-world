@@ -24,7 +24,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Inter+Tight:wght@300;400&display=swap" rel="stylesheet" />
 
   <!-- Three.js r128 -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+
+<!-- Three.js CSS3DRenderer (used by garden.js for the check-in panel) -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
 
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -1196,6 +1199,11 @@
 
       // 1. Renderer, camera, post-processing, render loop
       await initScene();
+
+      // TEMP: force noon for Segment 4 testing (full sun = visible scene).
+      // Remove once you want the time-of-day cycle back.
+      state.localHour = 12.0;
+
       window.atlasLoadProgress(22);
 
       // 2. Terrain — heightmap generation is CPU-side and takes ~200ms
@@ -1219,9 +1227,25 @@
 
       // Ground camera to terrain height at start position
       const { getHeightAt } = await import('./world/terrain.js');
+
+      // TEMP: spawn directly in the Garden zone for Segment 4 testing.
+      // Remove or change to (0, 0) once navigation between zones works.
+      state.camera.x       = -1600;
+      state.camera.z       =  1400;
+      state.camera.targetX = state.camera.x;
+      state.camera.targetZ = state.camera.z;
+
       const groundY = getHeightAt(state.camera.x, state.camera.z);
       state.camera.y       = groundY + 1.72;
       state.camera.targetY = state.camera.y;
+
+      window.atlasLoadProgress(90);
+
+      // 5. Garden zone — Segment 4
+      //    Habits zone with 80,000 grass blades + N flowers (one per habit row).
+      //    Loaded after auth has populated state.habits and after world is ready.
+      const { initGarden } = await import('./zones/garden.js');
+      await initGarden();
 
       window.atlasLoadProgress(100);
       window.atlasLoadComplete();

@@ -29,8 +29,7 @@
 
 import { CONFIG } from '../core/config.js';
 import { state }  from '../core/state.js';
-import { getHeightAt } from './terrain.js';
-
+import { getHeightAt } from '../world/terrain.js';
 const THREE = window.THREE;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
