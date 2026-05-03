@@ -223,15 +223,15 @@ precision highp float;
 //                                 uWindDir, uWetness — declared here.
 // Petal-specific vertex uniforms follow.
 
-uniform float uTime;          // Elapsed seconds — drives oscillation phase
-uniform float uWindStrength;  // Base wind strength [0, 1]
-uniform float uWindGust;      // Gust amplitude [0, 1] — used by windGustEnvelope()
-uniform vec2  uWindDir;       // Normalised XZ wind direction
+uniform highp float uTime;
+uniform highp float uWindStrength;
+uniform highp float uWindGust;
+uniform highp vec2  uWindDir;
 
 // Petal-specific vertex uniforms
-uniform float uWetness;       // Global wetness [0, 1] — droops wet petals in Y
-uniform float uPhase;         // Per-petal unique flutter phase [0, 2π]
-uniform float uDormancy;      // Dormancy factor [0=alive, 1=dormant]
+uniform highp float uWetness;
+uniform highp float uPhase;
+uniform highp float uDormancy;
 
 // ── Varyings — vertex → fragment ─────────────────────────────────────────────
 
@@ -337,19 +337,17 @@ precision mediump float;
 // ── Fragment uniforms ─────────────────────────────────────────────────────────
 
 // Appearance — set at material creation time (static per species per petal)
-uniform vec3  uColorBase;    // Linear RGB at petal base
-uniform vec3  uColorTip;     // Linear RGB at petal tip
-uniform float uCurvature;    // Cup depth: modulates SSS transmittance only
-uniform float uSpeckled;     // 1.0 = foxglove throat speckle enabled
-uniform float uTissue;       // 1.0 = poppy tissue semi-transparency enabled
-
-// Environment — updated per frame by _updatePetalUniforms()
-uniform vec3  uSunDir;       // World-space normalised direction toward sun
-uniform vec3  uSunColor;     // Linear RGB sun colour (temperature-driven)
-uniform float uIsNight;      // 0.0=day, 1.0=night — dims sun contribution
-uniform float uWetness;      // Global wetness [0, 1]
-uniform float uDormancy;     // [0=alive, 1=dormant] — desaturates albedo
-uniform float uTime;         // Elapsed seconds — animates grain hash offset
+uniform highp vec3  uColorBase;
+uniform highp vec3  uColorTip;
+uniform highp float uCurvature;
+uniform highp float uSpeckled;
+uniform highp float uTissue;
+uniform highp float uDormancy;
+uniform highp vec3  uSunDir;
+uniform highp vec3  uSunColor;
+uniform highp float uIsNight;
+uniform highp float uWetness;
+uniform highp float uTime;
 
 // Three.js provides cameraPosition as a built-in uniform — no declaration needed.
 
