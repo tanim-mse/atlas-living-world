@@ -327,7 +327,7 @@ void main() {
 // ║  FRAGMENT SHADER                                                         ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-precision mediump float;
+precision highp float;
 // highp is used for position arithmetic in the vertex shader.
 // mediump is sufficient for colour arithmetic in the fragment shader and
 // reduces ALU pressure on mobile-class GPUs. The RTX 2050 has full fp32

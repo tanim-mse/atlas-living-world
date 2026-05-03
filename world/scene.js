@@ -286,8 +286,9 @@ function _detectGPUTier() {
 // ─── Post-Processing — Render Targets ─────────────────────────────────────────
 
 function _buildPostProcessing() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const dpr = CONFIG.PIXEL_RATIO;              // same value used by renderer
+  const w   = Math.floor(window.innerWidth  * dpr);
+  const h   = Math.floor(window.innerHeight * dpr);
 
   const rtOptions = {
     minFilter:     THREE.LinearFilter,
@@ -446,8 +447,8 @@ function _buildCompositeMaterial() {
       uResolution:   { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
       uTime:         { value: 0.0 },
       uExposure:     { value: 1.0 },
-      uVigStrength:  { value: 0.38 },
-      uVigSoftness:  { value: 0.55 },
+      uVigStrength:  { value: 1.20 },
+      uVigSoftness:  { value: 0.80 },
       uCAStrength:   { value: 0.0006 },
       uGrainStrength:{ value: 0.048 },
       uBloomStrength:{ value: 0.32 },

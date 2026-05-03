@@ -706,6 +706,7 @@
   </style>
 </head>
 <body>
+  <div id="atlas-canvas-container"></div>
 
   <!-- ── WebGL canvas ─────────────────────────────────────────────────────── -->
   <canvas id="atlas-canvas"></canvas>
@@ -1197,8 +1198,20 @@
       // Progress: modules loaded
       window.atlasLoadProgress(10);
 
+      // TEMP: spawn directly in the Garden zone for Segment 4 testing.
+      // Set BEFORE initScene() so the camera is constructed at this position.
+      state.camera.x       = -1600;
+      state.camera.z       =  1400;
+      state.camera.targetX = state.camera.x;
+      state.camera.targetZ = state.camera.z;
+      state.currentZone    = 'garden';
+
       // 1. Renderer, camera, post-processing, render loop
       await initScene();
+
+      // TEMP: force noon for Segment 4 testing (full sun).
+      state.localHour = 12.0;
+      state.weather   = 'clear';
 
       // TEMP: force noon for Segment 4 testing (full sun = visible scene).
       // Remove once you want the time-of-day cycle back.
@@ -1226,15 +1239,7 @@
       window.atlasLoadProgress(82);
 
       // Ground camera to terrain height at start position
-      const { getHeightAt } = await import('./world/terrain.js');
-
-      // TEMP: spawn directly in the Garden zone for Segment 4 testing.
-      // Remove or change to (0, 0) once navigation between zones works.
-      state.camera.x       = -1600;
-      state.camera.z       =  1400;
-      state.camera.targetX = state.camera.x;
-      state.camera.targetZ = state.camera.z;
-
+    const { getHeightAt } = await import('./world/terrain.js');
       const groundY = getHeightAt(state.camera.x, state.camera.z);
       state.camera.y       = groundY + 1.72;
       state.camera.targetY = state.camera.y;
@@ -1242,8 +1247,6 @@
       window.atlasLoadProgress(90);
 
       // 5. Garden zone — Segment 4
-      //    Habits zone with 80,000 grass blades + N flowers (one per habit row).
-      //    Loaded after auth has populated state.habits and after world is ready.
       const { initGarden } = await import('./zones/garden.js');
       await initGarden();
 
